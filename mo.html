@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>くりすますでぇ - クソゲー</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #002200; font-family: 'MS Gothic', sans-serif; }
+        canvas { display: block; background: #003300; margin: 0 auto; border: 4px solid #fff; }
+        #gameOver {
+            display: none;
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: black;
+            color: red;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+        }
+        #gameOver h1 { font-size: 80px; margin: 0; font-weight: bold; }
+        #gameOver p { color: white; cursor: pointer; border: 1px solid white; padding: 10px; margin-top: 20px; }
+        #ui {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #0f0;
+            font-size: 24px;
+            text-shadow: 2px 2px #000;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+<div id="ui">支持率: <span id="rating">0</span>%</div>
+
+<div id="gameOver">
+    <h1>YOU DIED</h1>
+    <p onclick="location.reload()">もういちどやる</p>
+</div>
+<canvas id="gameCanvas"></canvas>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const gameOverScreen = document.getElementById('gameOver');
+const ratingDisplay = document.getElementById('rating');
+
+// ゲーム設定
+canvas.width = 400;
+canvas.height = 600;
+const PLAYER_Y = 50;
+const TARGET_Y = 520;
+const SPEED = 6;
+let approvalRating = 0;
+
+// 画像アセット（読み込めない場合は絵文字）
+function createImage(src, fallbackEmoji) {
+    const img = new Image();
+    img.src = src;
+    img.onload = () => img.ready = true;
+    img.fallback = fallbackEmoji;
+    return img;
+}
+
+const imgMo = createImage('mo.jpg', '🎅');
+const imgZinmin = createImage('zinmin.jpg', '👥');
+const imgCredit = createImage('credit.png', '💳');
+const imgTrump = createImage('trump.jpg', '🇺🇸');
+
+let playerX = 180;
+let items = [];
+let NPCs = [
+    { x: 50, type: 'zinmin' },
+    { x: 150, type: 'zinmin' },
+    { x: 250, type: 'zinmin' },
+    { x: 350, type: 'zinmin' }
+];
+
+// キー操作
+let keys = {};
+window.addEventListener('keydown', e => keys[e.code] = true);
+window.addEventListener('keyup', e => keys[e.code] = false);
+window.addEventListener('keydown', e => {
+    if(e.code === 'Space') dropItem();
+});
+
+function dropItem() {
+    items.push({ x: playerX + 5, y: PLAYER_Y + 40 });
+}
+
+function update() {
+    if (keys['ArrowLeft'] && playerX > 0) playerX -= SPEED;
+    if (keys['ArrowRight'] && playerX < canvas.width - 40) playerX += SPEED;
+
+    if (Math.random() < 0.02) {
+        let index = Math.floor(Math.random() * NPCs.length);
+        NPCs[index].type = (Math.random() > 0.6) ? 'trump' : 'zinmin';
+    }
+
+    for (let i = items.length - 1; i >= 0; i--) {
+        items[i].y += 8;
+
+        if (items[i].y > TARGET_Y - 20) {
+            let hitNPC = NPCs.find(n => Math.abs(n.x - items[i].x) < 40);
+            
+            if (hitNPC) {
+                if (hitNPC.type === 'trump') {
+                    approvalRating = 0;
+                    ratingDisplay.innerText = approvalRating;
+                    endGame();
+                } else {
+                    approvalRating += 5;
+                    ratingDisplay.innerText = approvalRating;
+                    hitNPC.happy = 10;
+                }
+                items.splice(i, 1);
+            } else if (items[i].y > canvas.height) {
+                items.splice(i, 1);
+            }
+        }
+    }
+}
+
+function drawImg(img, x, y, w, h) {
+    if (img.ready) {
+        ctx.drawImage(img, x, y, w, h);
+    } else {
+        ctx.font = `${w}px serif`;
+        ctx.fillText(img.fallback, x, y + h);
+    }
+}
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    drawImg(imgMo, playerX, PLAYER_Y, 40, 40);
+
+    items.forEach(item => {
+        drawImg(imgCredit, item.x, item.y, 30, 30);
+    });
+
+    NPCs.forEach(npc => {
+        let targetImg = (npc.type === 'trump') ? imgTrump : imgZinmin;
+        let scale = npc.happy > 0 ? 1.2 : 1.0;
+        if(npc.happy > 0) npc.happy--;
+        
+        drawImg(targetImg, npc.x - (20 * scale), TARGET_Y, 40 * scale, 40 * scale);
+    });
+
+    if (gameOverScreen.style.display !== 'flex') {
+        requestAnimationFrame(gameLoop);
+    }
+}
+
+function endGame() {
+    gameOverScreen.style.display = 'flex';
+}
+
+function gameLoop() {
+    update();
+    draw();
+}
+
+gameLoop();
+</script>
+</body>
+</html>
